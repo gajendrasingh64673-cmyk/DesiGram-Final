@@ -7,6 +7,7 @@ const BRANCH = "main";
 const TOKEN = process.env.GITHUB_TOKEN;
 const ROOT = "/home/runner/workspace";
 
+// Mirror .gitignore semantics: skip anything git wouldn't track
 const EXCLUDE_DIRS = new Set([
   ".git", "node_modules", ".cache", ".agents", ".local",
 ]);
@@ -43,76 +44,103 @@ async function ghFetch(path, method = "GET", body = null) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { message: text }; }
   if (!res.ok) {
     throw new Error(`GitHub ${res.status} on ${method} ${path}: ${JSON.stringify(data.message)}`);
   }
   return data;
 }
 
+async function createBlob(path, full) {
+  const content = readFileSync(full);
+  const isBinary = content.includes(0x00);
+  const encoding = isBinary ? "base64" : "utf-8";
+  const contentStr = isBinary
+    ? content.toString("base64")
+    : content.toString("utf-8");
+
+  // Any error here propagates — no silent skip
+  const blob = await ghFetch(`/repos/${OWNER}/${REPO}/git/blobs`, "POST", {
+    content: contentStr,
+    encoding,
+  });
+  return { path, sha: blob.sha };
+}
+
+async function getOrInitBaseSha() {
+  // Try to get existing main branch HEAD
+  try {
+    const ref = await ghFetch(`/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`);
+    const sha = ref.object?.sha;
+    if (sha) {
+      console.log(`Repository already initialized. Base SHA: ${sha}`);
+      return sha;
+    }
+  } catch (err) {
+    if (!err.message.includes("404")) throw err;
+  }
+
+  // Repo is empty — initialize it via Contents API (Git Data API rejects 409 on empty repos)
+  console.log("Repository is empty. Initializing with placeholder commit...");
+  const placeholder = await ghFetch(
+    `/repos/${OWNER}/${REPO}/contents/.gitkeep`,
+    "PUT",
+    {
+      message: "chore: initialize repository",
+      content: Buffer.from("").toString("base64"),
+    }
+  );
+  const sha = placeholder.commit.sha;
+  console.log(`Initialized. Base SHA: ${sha}`);
+  return sha;
+}
+
 async function main() {
   if (!TOKEN) throw new Error("GITHUB_TOKEN not set");
 
-  // Step 1: Initialize the empty repo by creating a placeholder file via Contents API
-  console.log("Initializing empty repository with placeholder commit...");
-  const placeholder = await ghFetch(`/repos/${OWNER}/${REPO}/contents/.gitkeep`, "PUT", {
-    message: "chore: initialize repository",
-    content: Buffer.from("").toString("base64"),
-  });
-  const baseSha = placeholder.commit.sha;
-  console.log(`Base commit SHA: ${baseSha}`);
+  // Step 1: Get or create the base commit SHA
+  const baseSha = await getOrInitBaseSha();
 
   // Step 2: Collect all workspace files
   console.log("\nCollecting files...");
   const files = getAllFiles(ROOT);
   console.log(`Found ${files.length} files to push`);
 
-  // Step 3: Create blobs for all files
+  // Step 3: Create blobs for ALL files — any failure is fatal, no silent skips
   console.log("\nCreating blobs (in batches of 10)...");
   const treeItems = [];
   const BATCH = 10;
 
   for (let i = 0; i < files.length; i += BATCH) {
     const batch = files.slice(i, i + BATCH);
+    // Errors propagate — a single blob failure aborts the entire push
     const results = await Promise.all(
-      batch.map(async ({ path, full }) => {
-        try {
-          const content = readFileSync(full);
-          // Detect binary: check for null bytes
-          const isBinary = content.includes(0x00);
-          const encoding = isBinary ? "base64" : "utf-8";
-          const contentStr = isBinary
-            ? content.toString("base64")
-            : content.toString("utf-8");
-
-          const blob = await ghFetch(`/repos/${OWNER}/${REPO}/git/blobs`, "POST", {
-            content: contentStr,
-            encoding,
-          });
-          return { path, sha: blob.sha };
-        } catch (err) {
-          console.error(`  Skipping ${path}: ${err.message}`);
-          return null;
-        }
-      })
+      batch.map(({ path, full }) => createBlob(path, full))
     );
     for (const r of results) {
-      if (r) {
-        treeItems.push({ path: r.path, mode: "100644", type: "blob", sha: r.sha });
-      }
+      treeItems.push({ path: r.path, mode: "100644", type: "blob", sha: r.sha });
     }
-    console.log(`  Processed ${Math.min(i + BATCH, files.length)}/${files.length}`);
+    console.log(`  Uploaded ${Math.min(i + BATCH, files.length)}/${files.length}`);
   }
 
-  // Remove the .gitkeep placeholder from the tree (we don't want it)
-  // It's not in our file list so it won't be in treeItems
+  // Strict integrity check: every discovered file must have a blob
+  if (treeItems.length !== files.length) {
+    throw new Error(
+      `File count mismatch: discovered ${files.length} files but only created ${treeItems.length} blobs. Aborting.`
+    );
+  }
+  console.log(`\nAll ${treeItems.length} blobs created successfully.`);
 
-  console.log(`\nCreating tree with ${treeItems.length} items...`);
+  // Step 4: Create a single tree
+  console.log("Creating tree...");
   const tree = await ghFetch(`/repos/${OWNER}/${REPO}/git/trees`, "POST", {
-    base_tree: null,  // fresh tree (we'll replace via force)
+    base_tree: null,
     tree: treeItems,
   });
 
+  // Step 5: Create the commit (child of baseSha)
   console.log("Creating commit...");
   const commitMsg = [
     "feat: initial push of DesiGram-Final backend scaffold",
@@ -122,7 +150,7 @@ async function main() {
     "- Drizzle ORM + PostgreSQL database setup",
     "- OpenAPI spec + Orval codegen (React Query hooks + Zod schemas)",
     "- pnpm monorepo workspace structure",
-    "- Zod validation schemas (zod/v4)",
+    "- Zod v4 validation schemas",
     "- UI component sandbox (mockup-sandbox with shadcn/ui)",
   ].join("\n");
 
@@ -132,18 +160,33 @@ async function main() {
     parents: [baseSha],
   });
 
-  console.log("Updating main branch to new commit...");
-  await ghFetch(`/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`, "PATCH", {
-    sha: commit.sha,
-    force: true,
-  });
+  // Step 6: Update the main branch ref — try fast-forward first, force only if needed
+  console.log("Updating main branch...");
+  try {
+    await ghFetch(`/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`, "PATCH", {
+      sha: commit.sha,
+      force: false,
+    });
+    console.log("Updated main branch (fast-forward).");
+  } catch (err) {
+    if (err.message.includes("422") || err.message.includes("not a fast forward")) {
+      console.warn("Non-fast-forward detected — force-updating main branch...");
+      await ghFetch(`/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`, "PATCH", {
+        sha: commit.sha,
+        force: true,
+      });
+      console.log("Updated main branch (forced).");
+    } else {
+      throw err;
+    }
+  }
 
   console.log(`\nSuccess!`);
   console.log(`Pushed ${treeItems.length} files to https://github.com/${OWNER}/${REPO}/tree/${BRANCH}`);
-  console.log(`Commit SHA: ${commit.sha}`);
+  console.log(`Commit: ${commit.sha}`);
 }
 
 main().catch((err) => {
-  console.error("\nPush failed:", err.message);
+  console.error("\nPush FAILED:", err.message);
   process.exit(1);
 });
