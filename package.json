@@ -1,6 +1,19 @@
+{
+  "name": "workspace",
+  "version": "0.0.5",
+  "license": "MIT",
   "scripts": {
     "preinstall": "echo 'Skipping check...'",
     "install": "pnpm install --no-frozen-lockfile",
     "build": "pnpm -r --if-present run build",
     "typecheck": "echo 'Skipping...'"
   },
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
