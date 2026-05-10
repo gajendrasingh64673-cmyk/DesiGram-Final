@@ -7,11 +7,37 @@ const BRANCH = "main";
 const TOKEN = process.env.GITHUB_TOKEN;
 const ROOT = "/home/runner/workspace";
 
-// Mirror .gitignore semantics: skip anything git wouldn't track
+// Directories that are never pushed (build artifacts, internal state, secrets)
 const EXCLUDE_DIRS = new Set([
   ".git", "node_modules", ".cache", ".agents", ".local",
 ]);
-const EXCLUDE_FILES = new Set([".replit", ".replitignore"]);
+
+// Specific filenames that must never be uploaded regardless of location.
+// Replit-internal files and known secret carriers are listed here because
+// this script does NOT parse .gitignore — using a denylist is the safe
+// alternative to prevent accidental secret leakage.
+// Note: local git remote ("origin") configuration is not performed here
+// because the Replit sandbox blocks git CLI commands. The push is done
+// entirely via the GitHub REST API.
+const EXCLUDE_FILES = new Set([
+  ".replit",
+  ".replitignore",
+  ".env",
+  ".env.local",
+  ".env.development",
+  ".env.production",
+  ".env.test",
+  ".npmrc",          // may contain auth tokens
+  ".yarnrc",
+  ".netrc",
+  "id_rsa",
+  "id_ed25519",
+  "*.pem",
+  "*.key",
+  "*.p12",
+  "*.pfx",
+]);
+
 const EXCLUDE_EXTS = new Set([".tsbuildinfo"]);
 
 function getAllFiles(dir, files = []) {
@@ -25,7 +51,12 @@ function getAllFiles(dir, files = []) {
       const rel = relative(ROOT, full);
       const parts = entry.split(".");
       const ext = parts.length > 1 ? "." + parts.pop() : "";
-      if (EXCLUDE_FILES.has(entry)) continue;
+      // Check exact filename match or glob-style extension patterns (e.g. "*.pem")
+      const isDenied = [...EXCLUDE_FILES].some((pattern) => {
+        if (pattern.startsWith("*.")) return entry.endsWith(pattern.slice(1));
+        return entry === pattern;
+      });
+      if (isDenied) continue;
       if (EXCLUDE_EXTS.has(ext)) continue;
       files.push({ path: rel, full });
     }
