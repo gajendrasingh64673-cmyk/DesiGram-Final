@@ -27,7 +27,6 @@ const EXCLUDE_FILES = new Set([
   ".env.development",
   ".env.production",
   ".env.test",
-  ".npmrc",          // may contain auth tokens
   ".yarnrc",
   ".netrc",
   "id_rsa",
