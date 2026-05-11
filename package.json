@@ -1,12 +1,12 @@
 {
-  "name": "desi-gram-backend",
-  "version": "0.0.9",
+  "name": "desi-gram-final",
+  "version": "0.1.0",
   "license": "MIT",
   "scripts": {
-    "preinstall": "echo 'Cleaning environment...'",
-    "install": "pnpm install --no-frozen-lockfile",
+    "preinstall": "echo 'Forcing fresh install...'",
+    "install": "pnpm install --no-frozen-lockfile --strict-plugin-options=false",
     "build": "pnpm -r --if-present run build",
-    "typecheck": "echo 'Skipping...'"
+    "typecheck": "echo 'Skipping checks...'"
   },
   "private": true,
   "devDependencies": {
