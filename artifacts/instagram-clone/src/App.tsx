@@ -852,6 +852,8 @@ export default function App() {
   const [reelCaption, setReelCaption] = useState("");
   const [reelError, setReelError] = useState("");
   const [profileTab, setProfileTab] = useState<ProfileTab>("posts");
+  const [showCreateSheet, setShowCreateSheet] = useState(false);
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(
     () => storage.get<Notification[]>(NOTIFS_KEY, [])
   );
@@ -1278,9 +1280,9 @@ export default function App() {
           </button>
           <button
             className="icon-btn"
-            aria-label="Create new post"
-            onClick={() => setShowComposer(true)}
-            title="New post"
+            aria-label="Create"
+            onClick={() => setShowCreateSheet(true)}
+            title="Create"
           >
             <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M6.5 6.5h-1A2.5 2.5 0 0 0 3 9v9.5A2.5 2.5 0 0 0 5.5 21H15a2.5 2.5 0 0 0 2.5-2.5v-1" strokeLinecap="round" />
@@ -1565,7 +1567,17 @@ export default function App() {
                 className="profile-avatar"
               />
               <div className="profile-meta">
-                <div className="profile-name">{session.displayName}</div>
+                <button
+                  type="button"
+                  className="profile-username-btn"
+                  onClick={() => setShowAccountSwitcher(true)}
+                  aria-label="Switch account"
+                >
+                  <span className="profile-name">{session.displayName}</span>
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden className="dropdown-caret">
+                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
                 <div className="profile-handle">@{session.username}</div>
                 <div className="profile-stats">
                   <span><strong>{myPosts.length}</strong> posts</span>
@@ -1689,8 +1701,8 @@ export default function App() {
         </button>
         <button
           className="nav-btn"
-          onClick={() => setShowComposer(true)}
-          aria-label="Create new post"
+          onClick={() => setShowCreateSheet(true)}
+          aria-label="Create"
         >
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" className="outline-active">
             <rect x="3" y="3" width="18" height="18" rx="5" />
@@ -1879,6 +1891,141 @@ export default function App() {
           canPrompt={!!installPrompt}
         />
       )}
+
+      {showCreateSheet && (
+        <CreateSheet
+          onClose={() => setShowCreateSheet(false)}
+          onPick={(kind) => {
+            setShowCreateSheet(false);
+            if (kind === "post") setShowComposer(true);
+            else if (kind === "reel") setShowReelComposer(true);
+            else {
+              setIgNotice(`${kind[0].toUpperCase()}${kind.slice(1)} — coming soon`);
+              setTimeout(() => setIgNotice(""), 2200);
+            }
+          }}
+        />
+      )}
+
+      {showAccountSwitcher && (
+        <AccountSwitcherSheet
+          accounts={accounts}
+          currentUsername={session.username}
+          onClose={() => setShowAccountSwitcher(false)}
+          onSwitch={(acc) => {
+            setShowAccountSwitcher(false);
+            if (acc.username !== session.username) setSession(acc);
+          }}
+          onAddAccount={() => {
+            setShowAccountSwitcher(false);
+            logout();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+type CreateKind = "reel" | "post" | "story" | "highlights" | "live" | "ai" | "ad" | "channel";
+
+function CreateSheet({ onClose, onPick }: { onClose: () => void; onPick: (kind: CreateKind) => void }) {
+  const items: { kind: CreateKind; label: string; icon: React.ReactNode }[] = [
+    { kind: "reel", label: "Reel", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none"/></svg>
+    )},
+    { kind: "post", label: "Post", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+    )},
+    { kind: "story", label: "Story", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeDasharray="3 2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" strokeDasharray="0" strokeLinecap="round"/></svg>
+    )},
+    { kind: "highlights", label: "Highlights", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeDasharray="3 2"><circle cx="12" cy="12" r="9"/><path strokeDasharray="0" d="M12 17s-5-3.2-5-7a3 3 0 0 1 5-2 3 3 0 0 1 5 2c0 3.8-5 7-5 7z" strokeLinejoin="round"/></svg>
+    )},
+    { kind: "live", label: "Live", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M7 8a6 6 0 0 0 0 8M17 8a6 6 0 0 1 0 8M4 5a10 10 0 0 0 0 14M20 5a10 10 0 0 1 0 14" strokeLinecap="round"/></svg>
+    )},
+    { kind: "ai", label: "AI", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M16 6l1.5 1.5M16 6l-1.5 1.5M16 6v2" strokeLinecap="round"/></svg>
+    )},
+    { kind: "ad", label: "Ad", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 17l6-6 4 4 8-8" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 7h7v7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    )},
+    { kind: "channel", label: "Channel", icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 12a9 9 0 1 1-3.5-7.1L21 3v6h-6"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>
+    )},
+  ];
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="bottom-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Create">
+        <div className="sheet-handle" aria-hidden />
+        <h2 className="sheet-title">Create</h2>
+        <ul className="sheet-list" role="menu">
+          {items.map((it) => (
+            <li key={it.kind} role="none">
+              <button type="button" role="menuitem" className="sheet-item" onClick={() => onPick(it.kind)}>
+                <span className="sheet-item-icon">{it.icon}</span>
+                <span className="sheet-item-label">{it.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function AccountSwitcherSheet({
+  accounts,
+  currentUsername,
+  onClose,
+  onSwitch,
+  onAddAccount,
+}: {
+  accounts: Account[];
+  currentUsername: string;
+  onClose: () => void;
+  onSwitch: (acc: Account) => void;
+  onAddAccount: () => void;
+}) {
+  const ordered = [...accounts].sort((a, b) =>
+    a.username === currentUsername ? -1 : b.username === currentUsername ? 1 : 0
+  );
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="bottom-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Switch account">
+        <div className="sheet-handle" aria-hidden />
+        <ul className="sheet-list account-list" role="menu">
+          {ordered.map((a) => {
+            const isCurrent = a.username === currentUsername;
+            return (
+              <li key={a.username} role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="sheet-item account-row"
+                  onClick={() => onSwitch(a)}
+                >
+                  <Avatar src={a.avatar} name={a.displayName} username={a.username} size={44} />
+                  <span className="account-name">{a.username}</span>
+                  {isCurrent && (
+                    <svg className="account-check" viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+                      <circle cx="12" cy="12" r="10" fill="#1877f2" />
+                      <path d="M7 12.5l3.5 3.5L17 9.5" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+          <li role="none">
+            <button type="button" role="menuitem" className="sheet-item account-row add-row" onClick={onAddAccount}>
+              <span className="add-icon" aria-hidden>+</span>
+              <span className="account-name">Add account</span>
+            </button>
+          </li>
+        </ul>
+      </div>
     </div>
   );
 }

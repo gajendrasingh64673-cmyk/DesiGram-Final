@@ -979,3 +979,76 @@ h1, h2, p, span, div, label, button, input, textarea, a {
   padding: 14px 16px 8px;
   margin: 0;
 }
+
+/* === Bottom sheets (Create + Account switcher) === */
+.sheet-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 1000;
+  animation: sheetFadeIn 0.18s ease-out;
+}
+.bottom-sheet {
+  width: 100%; max-width: 540px;
+  background: #fff;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  padding: 8px 0 28px;
+  box-shadow: 0 -6px 24px rgba(0,0,0,0.15);
+  animation: sheetSlideUp 0.22s cubic-bezier(.2,.8,.2,1);
+  max-height: 85vh; overflow-y: auto;
+}
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: #c7c7c7;
+  border-radius: 2px;
+  margin: 6px auto 12px;
+}
+.sheet-title {
+  text-align: center;
+  font-size: 16px; font-weight: 700;
+  margin: 0 0 4px;
+  color: #000;
+}
+.sheet-list {
+  list-style: none; padding: 0; margin: 8px 0 0;
+}
+.sheet-item {
+  width: 100%; background: none; border: 0;
+  display: flex; align-items: center; gap: 18px;
+  padding: 14px 20px;
+  font-size: 16px; color: #000;
+  cursor: pointer; text-align: left;
+  border-bottom: 1px solid #f1f1f1;
+}
+.sheet-item:last-child { border-bottom: 0; }
+.sheet-item:active { background: #fafafa; }
+.sheet-item-icon { display: inline-flex; color: #000; }
+.sheet-item-label { font-weight: 500; }
+
+/* Account switcher */
+.account-list .sheet-item { padding: 10px 20px; gap: 14px; }
+.account-row { position: relative; }
+.account-name { flex: 1; font-weight: 500; }
+.account-check { flex-shrink: 0; }
+.add-row .add-icon {
+  width: 44px; height: 44px;
+  border: 1.5px solid #dbdbdb;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 300; color: #000;
+}
+
+/* Profile username button (with dropdown caret) */
+.profile-username-btn {
+  background: none; border: 0; padding: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; color: #000;
+  font: inherit;
+}
+.profile-username-btn .profile-name { font-weight: 700; font-size: 18px; }
+.profile-username-btn .dropdown-caret { color: #000; opacity: 0.8; }
+.profile-username-btn:active { opacity: 0.6; }
+
+@keyframes sheetFadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes sheetSlideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
