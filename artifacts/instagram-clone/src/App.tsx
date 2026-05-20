@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./instagram.css";
 
 type Post = {
@@ -854,6 +854,7 @@ export default function App() {
   const [profileTab, setProfileTab] = useState<ProfileTab>("posts");
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
+  const reelFileInputRef = useRef<HTMLInputElement>(null);
   const [notifications, setNotifications] = useState<Notification[]>(
     () => storage.get<Notification[]>(NOTIFS_KEY, [])
   );
@@ -1809,59 +1810,88 @@ export default function App() {
       )}
 
       {showReelComposer && (
-        <div className="modal-backdrop" onClick={resetReelComposer}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>New reel</h2>
-              <button className="icon-btn" aria-label="Close" onClick={resetReelComposer}>×</button>
-            </div>
-            <form className="composer" onSubmit={submitReel}>
-              <div className="composer-author">
-                <Avatar
-                  src={session.avatar}
-                  name={session.displayName}
-                  username={session.username}
-                  size={36}
-                />
-                <div>
-                  <div className="username">{session.displayName}</div>
-                  <div className="handle">@{session.username}</div>
-                </div>
-              </div>
+        <div className="reel-picker" role="dialog" aria-label="New reel">
+          <header className="reel-picker-top">
+            <button className="reel-icon-btn" aria-label="Close" onClick={resetReelComposer}>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round"/></svg>
+            </button>
+            <h2 className="reel-picker-title">New reel</h2>
+            <button className="reel-icon-btn" aria-label="Settings" onClick={() => { setIgNotice("Reel settings — coming soon"); setTimeout(()=>setIgNotice(""), 1800); }}>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" strokeLinejoin="round"/></svg>
+            </button>
+          </header>
 
-              {reelVideoData ? (
-                <div className="composer-preview reel-preview">
-                  <video src={reelVideoData} controls playsInline />
-                </div>
-              ) : (
-                <div className="composer-placeholder">Pick a short video (under 6 MB)</div>
-              )}
-
-              <label className="field">
-                <span>Video file</span>
-                <input type="file" accept="video/*" onChange={onReelFile} />
-              </label>
-
-              <label className="field">
-                <span>Caption</span>
-                <textarea
-                  rows={3}
-                  placeholder="Say something about your reel…"
-                  value={reelCaption}
-                  onChange={(e) => setReelCaption(e.target.value)}
-                />
-              </label>
-
-              {reelError && <div className="form-error">{reelError}</div>}
-
-              <div className="composer-actions">
-                <button type="button" className="btn-secondary" onClick={resetReelComposer}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">Share reel</button>
-              </div>
-            </form>
+          <div className="reel-picker-pills">
+            <button type="button" className="reel-pill" onClick={() => { setIgNotice("Drafts — coming soon"); setTimeout(()=>setIgNotice(""), 1800); }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeDasharray="3 2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8" strokeDasharray="0" strokeLinecap="round"/></svg>
+              <span>Drafts</span>
+            </button>
+            <button type="button" className="reel-pill" onClick={() => { setIgNotice("Templates — coming soon"); setTimeout(()=>setIgNotice(""), 1800); }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="6" width="14" height="14" rx="2"/><rect x="7" y="3" width="14" height="14" rx="2"/></svg>
+              <span>Templates</span>
+            </button>
           </div>
+
+          <div className="reel-picker-sub">
+            <button type="button" className="reel-sub-btn">
+              <span>Recents</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            <button type="button" className="reel-select-pill" onClick={() => reelFileInputRef.current?.click()}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="14" height="14" rx="2"/><rect x="8" y="8" width="12" height="12" rx="2"/></svg>
+              <span>Select</span>
+            </button>
+          </div>
+
+          <div className="reel-picker-grid">
+            <button type="button" className="reel-grid-cell reel-camera-cell" onClick={() => reelFileInputRef.current?.click()} aria-label="Pick a video">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            </button>
+            {reelVideoData && (
+              <div className="reel-grid-cell reel-pick-preview">
+                <video src={reelVideoData} muted playsInline preload="metadata" />
+                <span className="reel-pick-check" aria-hidden>
+                  <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="10" fill="#1877f2"/><path d="M7 12.5l3.5 3.5L17 9.5" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </span>
+              </div>
+            )}
+            {myReels.slice(0, 8).map((r) => (
+              <div key={r.id} className="reel-grid-cell reel-existing">
+                <video src={r.video} muted playsInline preload="metadata" />
+              </div>
+            ))}
+            {Array.from({ length: Math.max(0, 11 - myReels.length - (reelVideoData ? 1 : 0)) }).map((_, i) => (
+              <div key={`ph-${i}`} className="reel-grid-cell reel-grid-placeholder" />
+            ))}
+          </div>
+
+          <input
+            ref={reelFileInputRef}
+            type="file"
+            accept="video/*"
+            style={{ display: "none" }}
+            onChange={onReelFile}
+          />
+
+          {reelVideoData && (
+            <form className="reel-bottom-bar" onSubmit={submitReel}>
+              <input
+                type="text"
+                className="reel-caption-input"
+                placeholder="Say something about your reel…"
+                value={reelCaption}
+                onChange={(e) => setReelCaption(e.target.value)}
+              />
+              <button type="submit" className="reel-share-btn">Share</button>
+            </form>
+          )}
+
+          {reelError && <div className="reel-error">{reelError}</div>}
+
+          <nav className="reel-picker-tabs" aria-label="Composer tabs">
+            <button type="button" className="reel-tab active">REEL</button>
+            <button type="button" className="reel-tab" onClick={() => { setIgNotice("Templates — coming soon"); setTimeout(()=>setIgNotice(""), 1800); }}>TEMPLATES</button>
+          </nav>
         </div>
       )}
 
