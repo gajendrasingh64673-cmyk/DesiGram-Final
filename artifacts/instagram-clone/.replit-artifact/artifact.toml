@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Instagram Clone"
+version = "1.0.0"
+id = "artifacts/instagram-clone"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22622
+
+[services.development]
+run = "pnpm --filter @workspace/instagram-clone run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/instagram-clone", "run", "build" ]
+publicDir = "artifacts/instagram-clone/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22622"
+BASE_PATH = "/"
