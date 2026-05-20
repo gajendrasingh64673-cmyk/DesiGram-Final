@@ -1191,3 +1191,10 @@ h1, h2, p, span, div, label, button, input, textarea, a {
   overflow: hidden;
   left: -9999px;
 }
+
+/* Make label-based triggers behave/look like the original buttons */
+label.reel-camera-cell, label.reel-grid-cell {
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+label.reel-select-pill { cursor: pointer; }
