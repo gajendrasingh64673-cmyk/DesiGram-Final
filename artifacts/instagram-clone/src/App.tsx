@@ -936,13 +936,13 @@ export default function App() {
   }
 
   const toggleLike = (id: number) => {
-    let target: Post | undefined;
+    const target = posts.find((p) => p.id === id);
     setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        target = p;
-        return { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 };
-      })
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
+          : p
+      )
     );
     if (target && !target.liked && target.username !== session.username) {
       const notif: Notification = {
@@ -1175,15 +1175,15 @@ export default function App() {
   const storyAccounts = accounts.filter((a) => a.username !== session.username).slice(0, 12);
 
   useEffect(() => {
-    if (tab === "notifications" && unreadCount > 0) {
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.recipient === session.username && !n.read ? { ...n, read: true } : n
-        )
+    if (tab !== "notifications") return;
+    const me = session.username;
+    setNotifications((prev) => {
+      if (!prev.some((n) => n.recipient === me && !n.read)) return prev;
+      return prev.map((n) =>
+        n.recipient === me && !n.read ? { ...n, read: true } : n
       );
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+    });
+  }, [tab, session.username]);
   const filteredAccounts = accounts.filter((a) => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return a.username !== session.username;
@@ -1261,8 +1261,8 @@ export default function App() {
                   <button
                     type="button"
                     className="story-ring"
-                    onClick={() => setTab("search")}
-                    aria-label={`${a.displayName}'s story`}
+                    onClick={() => { setSearchQuery(a.username); setTab("search"); }}
+                    aria-label={`View ${a.displayName}'s profile`}
                   >
                     <Avatar src={a.avatar} name={a.displayName} username={a.username} size={60} />
                   </button>
