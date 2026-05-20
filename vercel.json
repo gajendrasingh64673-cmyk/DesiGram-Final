@@ -4,6 +4,9 @@
   "outputDirectory": "artifacts/instagram-clone/dist/public",
   "framework": null,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
