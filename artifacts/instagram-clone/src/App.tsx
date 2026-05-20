@@ -10,6 +10,8 @@ type Post = {
   caption: string;
   likes: number;
   liked: boolean;
+  saved?: boolean;
+  ts?: number;
 };
 
 type Comment = {
@@ -198,6 +200,7 @@ function PostCard({
   comments,
   currentUsername,
   onToggleLike,
+  onToggleSave,
   onDelete,
   onAddComment,
   onDeleteComment,
@@ -206,6 +209,7 @@ function PostCard({
   comments: Comment[];
   currentUsername: string;
   onToggleLike: (id: number) => void;
+  onToggleSave?: (id: number) => void;
   onDelete: (id: number) => void;
   onAddComment: (postId: number, text: string) => void;
   onDeleteComment: (postId: number, commentId: number) => void;
@@ -270,11 +274,38 @@ function PostCard({
             />
           </svg>
         </button>
-        <label htmlFor={`comment-input-${post.id}`} className="icon-btn" aria-label="Comment">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 12a9 9 0 1 1-3.5-7.1L21 4l-1 3.5A9 9 0 0 1 21 12z" strokeLinejoin="round" />
+        <label htmlFor={`comment-input-${post.id}`} className="action-btn" aria-label="Comment">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" strokeLinejoin="round" />
           </svg>
         </label>
+        <button
+          className="action-btn"
+          aria-label="Share"
+          onClick={() => {
+            const url = `${window.location.origin}/?post=${post.id}`;
+            if (navigator.share) {
+              navigator.share({ title: `${post.displayName} on DesiGram`, text: post.caption, url }).catch(() => {});
+            } else if (navigator.clipboard) {
+              navigator.clipboard.writeText(url).catch(() => {});
+            }
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 2 11 13" strokeLinecap="round" />
+            <path d="M22 2 15 22l-4-9-9-4 20-7z" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <span className="spacer" />
+        <button
+          className={`action-btn ${post.saved ? "saved" : ""}`}
+          aria-label={post.saved ? "Unsave" : "Save"}
+          onClick={() => onToggleSave?.(post.id)}
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" fill={post.saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+            <path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
 
       <div className="post-meta">
@@ -961,6 +992,10 @@ export default function App() {
     }
   };
 
+  const toggleSave = (id: number) => {
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, saved: !p.saved } : p)));
+  };
+
   const deletePost = (id: number) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
     setCommentsByPost((prev) => {
@@ -1203,33 +1238,32 @@ export default function App() {
               onClick={() => (installPrompt ? triggerInstall() : setShowInstall(true))}
               aria-label="Install app"
             >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 4v12" strokeLinecap="round" />
-                <path d="m6 12 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M5 20h14" strokeLinecap="round" />
-              </svg>
               Get app
             </button>
           )}
           <button
-            className="icon-btn create-btn"
-            aria-label="Upload a reel"
-            onClick={() => setShowReelComposer(true)}
-            title="Upload a reel"
+            className="icon-btn topbar-btn"
+            aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+            onClick={() => setTab("notifications")}
           >
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="5" width="18" height="14" rx="3" />
-              <path d="M10 9.5v5l5-2.5-5-2.5z" fill="currentColor" stroke="none" />
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 21s-7-4.35-7-10a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 5.65-7 10-7 10z" strokeLinejoin="round" />
             </svg>
+            {unreadCount > 0 && (
+              <span className="topbar-badge" aria-hidden>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </button>
           <button
-            className="icon-btn create-btn"
+            className="icon-btn"
             aria-label="Create new post"
             onClick={() => setShowComposer(true)}
+            title="New post"
           >
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="4" />
-              <path d="M12 8v8M8 12h8" strokeLinecap="round" />
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6.5 6.5h-1A2.5 2.5 0 0 0 3 9v9.5A2.5 2.5 0 0 0 5.5 21H15a2.5 2.5 0 0 0 2.5-2.5v-1" strokeLinecap="round" />
+              <path d="m15 5 4 4M14 6l4 4-7.5 7.5H6.5V13.5L14 6z" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
@@ -1303,6 +1337,7 @@ export default function App() {
                     comments={commentsByPost[p.id] ?? []}
                     currentUsername={session.username}
                     onToggleLike={toggleLike}
+                    onToggleSave={toggleSave}
                     onDelete={deletePost}
                     onAddComment={addComment}
                     onDeleteComment={deleteComment}
@@ -1605,9 +1640,34 @@ export default function App() {
           onClick={() => setTab("home")}
           aria-label="Home"
         >
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 12 12 3l9 9" strokeLinejoin="round" />
-            <path d="M5 10v10h14V10" strokeLinejoin="round" />
+          {tab === "home" ? (
+            <svg viewBox="0 0 24 24" width="26" height="26">
+              <path d="M3 11 12 3l9 8v10h-6v-6h-6v6H3V11z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" className="outline-active">
+              <path d="M3 11 12 3l9 8v10h-6v-6h-6v6H3V11z" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+        <button
+          className={`nav-btn ${tab === "search" ? "active" : ""}`}
+          onClick={() => setTab("search")}
+          aria-label="Search"
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth={tab === "search" ? 2.6 : 1.8} className="outline-active">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
+          className="nav-btn"
+          onClick={() => setShowComposer(true)}
+          aria-label="Create new post"
+        >
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" className="outline-active">
+            <rect x="3" y="3" width="18" height="18" rx="5" />
+            <path d="M12 8v8M8 12h8" strokeLinecap="round" />
           </svg>
         </button>
         <button
@@ -1615,36 +1675,16 @@ export default function App() {
           onClick={() => setTab("reels")}
           aria-label="Reels"
         >
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="3" />
-            <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
-        <button
-          className={`nav-btn ${tab === "search" ? "active" : ""}`}
-          onClick={() => setTab("search")}
-          aria-label="Search"
-        >
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-          </svg>
-        </button>
-        <button
-          className={`nav-btn ${tab === "notifications" ? "active" : ""}`}
-          onClick={() => setTab("notifications")}
-          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-        >
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
-            <path
-              d="M12 21s-7-4.35-7-10a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 5.65-7 10-7 10z"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {unreadCount > 0 && (
-            <span className="nav-badge" aria-hidden>
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
+          {tab === "reels" ? (
+            <svg viewBox="0 0 24 24" width="26" height="26">
+              <path d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6z" fill="currentColor"/>
+              <path d="M10 8.5v7l6-3.5-6-3.5z" fill="#fff" stroke="none" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" className="outline-active">
+              <rect x="3" y="3" width="18" height="18" rx="4" />
+              <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none" />
+            </svg>
           )}
         </button>
         <button
