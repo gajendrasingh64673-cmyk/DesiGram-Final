@@ -27,7 +27,21 @@ type Account = {
   bio?: string;
 };
 
-type Tab = "home" | "reels" | "search" | "profile";
+type Tab = "home" | "reels" | "search" | "notifications" | "profile";
+
+type Notification = {
+  id: number;
+  recipient: string;
+  kind: "like" | "comment";
+  actorUsername: string;
+  actorDisplayName: string;
+  actorAvatar: string;
+  postId: number;
+  postImage: string;
+  text?: string;
+  ts: number;
+  read: boolean;
+};
 
 type Reel = {
   id: number;
@@ -66,6 +80,7 @@ const COMMENTS_KEY = `${STORAGE_PREFIX}comments`;
 const ACCOUNTS_KEY = `${STORAGE_PREFIX}accounts`;
 const SESSION_KEY = `${STORAGE_PREFIX}session`;
 const REELS_KEY = `${STORAGE_PREFIX}reels`;
+const NOTIFS_KEY = `${STORAGE_PREFIX}notifications`;
 
 const storage = {
   get<T>(key: string, fallback: T): T {
@@ -116,6 +131,18 @@ function placeholderAvatar(seed: string, name: string): string {
   const initials = initialsOf(name || seed);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="${color}"/><text x="50%" y="50%" dy=".1em" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-weight="600" font-size="34">${initials}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function formatTimeAgo(ts: number): string {
+  const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString();
 }
 
 function readFileAsDataURL(file: File): Promise<string> {
@@ -787,9 +814,13 @@ export default function App() {
   const [reelCaption, setReelCaption] = useState("");
   const [reelError, setReelError] = useState("");
   const [profileTab, setProfileTab] = useState<ProfileTab>("posts");
+  const [notifications, setNotifications] = useState<Notification[]>(
+    () => storage.get<Notification[]>(NOTIFS_KEY, [])
+  );
 
   useEffect(() => { storage.set(POSTS_KEY, posts); }, [posts]);
   useEffect(() => { storage.set(COMMENTS_KEY, commentsByPost); }, [commentsByPost]);
+  useEffect(() => { storage.set(NOTIFS_KEY, notifications); }, [notifications]);
   useEffect(() => {
     try { storage.set(REELS_KEY, reels); }
     catch { /* quota — ignore */ }
@@ -905,13 +936,29 @@ export default function App() {
   }
 
   const toggleLike = (id: number) => {
+    let target: Post | undefined;
     setPosts((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
-          : p
-      )
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        target = p;
+        return { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 };
+      })
     );
+    if (target && !target.liked && target.username !== session.username) {
+      const notif: Notification = {
+        id: Date.now(),
+        recipient: target.username,
+        kind: "like",
+        actorUsername: session.username,
+        actorDisplayName: session.displayName,
+        actorAvatar: session.avatar,
+        postId: target.id,
+        postImage: target.image,
+        ts: Date.now(),
+        read: false,
+      };
+      setNotifications((prev) => [notif, ...prev]);
+    }
   };
 
   const deletePost = (id: number) => {
@@ -935,6 +982,23 @@ export default function App() {
       };
       return { ...prev, [postId]: [...list, newComment] };
     });
+    const post = posts.find((p) => p.id === postId);
+    if (post && post.username !== session.username) {
+      const notif: Notification = {
+        id: Date.now(),
+        recipient: post.username,
+        kind: "comment",
+        actorUsername: session.username,
+        actorDisplayName: session.displayName,
+        actorAvatar: session.avatar,
+        postId: post.id,
+        postImage: post.image,
+        text,
+        ts: Date.now(),
+        read: false,
+      };
+      setNotifications((prev) => [notif, ...prev]);
+    }
   };
 
   const deleteComment = (postId: number, commentId: number) => {
@@ -1105,6 +1169,21 @@ export default function App() {
 
   const myPosts = posts.filter((p) => p.username === session.username);
   const myReels = reels.filter((r) => r.username === session.username);
+  const otherPosts = posts.filter((p) => p.username !== session.username);
+  const myNotifs = notifications.filter((n) => n.recipient === session.username);
+  const unreadCount = myNotifs.filter((n) => !n.read).length;
+  const storyAccounts = accounts.filter((a) => a.username !== session.username).slice(0, 12);
+
+  useEffect(() => {
+    if (tab === "notifications" && unreadCount > 0) {
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.recipient === session.username && !n.read ? { ...n, read: true } : n
+        )
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
   const filteredAccounts = accounts.filter((a) => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return a.username !== session.username;
@@ -1159,6 +1238,38 @@ export default function App() {
       <main className="feed-wrap">
         {tab === "home" && (
           <section className="feed">
+            <div className="stories-row" aria-label="Stories">
+              <div className="story">
+                <button
+                  type="button"
+                  className="story-ring story-ring-add"
+                  onClick={() => setShowComposer(true)}
+                  aria-label="Add to your story"
+                >
+                  <Avatar
+                    src={session.avatar}
+                    name={session.displayName}
+                    username={session.username}
+                    size={60}
+                  />
+                  <span className="story-plus" aria-hidden>+</span>
+                </button>
+                <span className="story-name">Your story</span>
+              </div>
+              {storyAccounts.map((a) => (
+                <div key={a.username} className="story">
+                  <button
+                    type="button"
+                    className="story-ring"
+                    onClick={() => setTab("search")}
+                    aria-label={`${a.displayName}'s story`}
+                  >
+                    <Avatar src={a.avatar} name={a.displayName} username={a.username} size={60} />
+                  </button>
+                  <span className="story-name">{a.username}</span>
+                </div>
+              ))}
+            </div>
             {igStatus && !igStatus.connected && igStatus.configured && (
               <div className="ig-connect-banner">
                 <div className="ig-connect-banner-text">
@@ -1312,21 +1423,78 @@ export default function App() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <ul className="user-list">
-              {filteredAccounts.length === 0 ? (
-                <li className="user-empty">No people found.</li>
-              ) : (
-                filteredAccounts.map((a) => (
-                  <li key={a.username} className="user-row">
-                    <Avatar src={a.avatar} name={a.displayName} username={a.username} size={44} />
-                    <div className="user-info">
-                      <span className="username">{a.displayName}</span>
-                      <span className="handle">@{a.username}</span>
+            {searchQuery.trim() !== "" && (
+              <ul className="user-list">
+                {filteredAccounts.length === 0 ? (
+                  <li className="user-empty">No people found.</li>
+                ) : (
+                  filteredAccounts.map((a) => (
+                    <li key={a.username} className="user-row">
+                      <Avatar src={a.avatar} name={a.displayName} username={a.username} size={44} />
+                      <div className="user-info">
+                        <span className="username">{a.displayName}</span>
+                        <span className="handle">@{a.username}</span>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+            {searchQuery.trim() === "" && (
+              <div className="explore">
+                <h3 className="section-title">Explore</h3>
+                {otherPosts.length === 0 ? (
+                  <div className="explore-empty">Nothing to explore yet. Be the first to post!</div>
+                ) : (
+                  <div className="grid explore-grid">
+                    {otherPosts.map((p) => (
+                      <div key={p.id} className="grid-cell">
+                        <img src={p.image} alt={p.caption} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab === "notifications" && (
+          <section className="notifications">
+            <h2 className="section-title">Notifications</h2>
+            {myNotifs.length === 0 ? (
+              <div className="empty-feed">
+                <div className="empty-title">No notifications yet</div>
+                <div className="empty-sub">
+                  When people like or comment on your posts, you'll see it here.
+                </div>
+              </div>
+            ) : (
+              <ul className="notif-list">
+                {myNotifs.map((n) => (
+                  <li key={n.id} className={`notif-row ${!n.read ? "unread" : ""}`}>
+                    <Avatar
+                      src={n.actorAvatar}
+                      name={n.actorDisplayName}
+                      username={n.actorUsername}
+                      size={44}
+                    />
+                    <div className="notif-text">
+                      <div>
+                        <span className="username">{n.actorDisplayName}</span>{" "}
+                        {n.kind === "like" ? (
+                          <>liked your post.</>
+                        ) : (
+                          <>commented: <span className="notif-comment">{n.text}</span></>
+                        )}
+                      </div>
+                      <div className="notif-time">{formatTimeAgo(n.ts)}</div>
                     </div>
+                    <img className="notif-thumb" src={n.postImage} alt="" />
                   </li>
-                ))
-              )}
-            </ul>
+                ))}
+              </ul>
+            )}
           </section>
         )}
 
@@ -1461,6 +1629,23 @@ export default function App() {
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" strokeLinecap="round" />
           </svg>
+        </button>
+        <button
+          className={`nav-btn ${tab === "notifications" ? "active" : ""}`}
+          onClick={() => setTab("notifications")}
+          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
+            <path
+              d="M12 21s-7-4.35-7-10a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 5.65-7 10-7 10z"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {unreadCount > 0 && (
+            <span className="nav-badge" aria-hidden>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </button>
         <button
           className={`nav-btn ${tab === "profile" ? "active" : ""}`}
