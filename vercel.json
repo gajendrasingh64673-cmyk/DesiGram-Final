@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install -g pnpm@9 && pnpm install --filter @workspace/instagram-clone... --config.minimumReleaseAge=0",
+  "installCommand": "npm install -g pnpm@10 && pnpm install --filter @workspace/instagram-clone... --no-frozen-lockfile --config.minimumReleaseAge=0",
   "buildCommand": "pnpm --filter @workspace/instagram-clone run build",
   "outputDirectory": "artifacts/instagram-clone/dist/public",
   "framework": null,
