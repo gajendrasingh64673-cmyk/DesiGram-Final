@@ -1198,3 +1198,23 @@ label.reel-camera-cell, label.reel-grid-cell {
   display: flex; align-items: center; justify-content: center;
 }
 label.reel-select-pill { cursor: pointer; }
+
+.reel-picker-hint {
+  text-align: center;
+  color: #888;
+  font-size: 12px;
+  padding: 2px 16px 10px;
+  background: #000;
+}
+label.reel-grid-placeholder {
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+}
+label.reel-grid-placeholder:active { opacity: 1; background: #2a2a2a; }
+button.reel-existing {
+  background: #1a1a1a; border: 0; padding: 0; margin: 0;
+  cursor: pointer;
+}
+button.reel-existing:active { opacity: 0.7; }

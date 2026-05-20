@@ -1842,6 +1842,10 @@ export default function App() {
             </label>
           </div>
 
+          <div className="reel-picker-hint">
+            Tap any tile to open your gallery, or the camera icon to record
+          </div>
+
           <div className="reel-picker-grid">
             <label htmlFor="reel-camera-input" className="reel-grid-cell reel-camera-cell" aria-label="Record a video">
               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
@@ -1855,12 +1859,20 @@ export default function App() {
               </div>
             )}
             {myReels.slice(0, 8).map((r) => (
-              <div key={r.id} className="reel-grid-cell reel-existing">
+              <button
+                key={r.id}
+                type="button"
+                className="reel-grid-cell reel-existing"
+                onClick={() => { setReelVideoData(r.video); setReelError(""); }}
+                aria-label="Use this existing reel"
+              >
                 <video src={r.video} muted playsInline preload="metadata" />
-              </div>
+              </button>
             ))}
             {Array.from({ length: Math.max(0, 11 - myReels.length - (reelVideoData ? 1 : 0)) }).map((_, i) => (
-              <div key={`ph-${i}`} className="reel-grid-cell reel-grid-placeholder" />
+              <label key={`ph-${i}`} htmlFor="reel-gallery-input" className="reel-grid-cell reel-grid-placeholder" aria-label="Pick from gallery">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#555" strokeWidth="1.6" aria-hidden><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5" fill="#555" stroke="none"/><path d="M21 17l-5-5-9 9"/></svg>
+              </label>
             ))}
           </div>
 
