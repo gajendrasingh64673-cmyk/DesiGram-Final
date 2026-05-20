@@ -234,6 +234,13 @@ function PostCard({
     onToggleLike(post.id);
   };
 
+  const likeOnly = () => {
+    if (post.liked) return;
+    setBursting(true);
+    setTimeout(() => setBursting(false), 350);
+    onToggleLike(post.id);
+  };
+
   return (
     <article className="post">
       <header className="post-header">
@@ -253,7 +260,7 @@ function PostCard({
         )}
       </header>
 
-      <div className="post-image-wrap" onDoubleClick={toggleLike}>
+      <div className="post-image-wrap" onDoubleClick={likeOnly}>
         <img className="post-image" src={post.image} alt={post.caption} />
       </div>
 
@@ -967,15 +974,17 @@ export default function App() {
   }
 
   const toggleLike = (id: number) => {
-    const target = posts.find((p) => p.id === id);
+    let shouldNotify: Post | null = null;
     setPosts((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
-          : p
-      )
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const nextLiked = !p.liked;
+        if (nextLiked && p.username !== session.username) shouldNotify = p;
+        return { ...p, liked: nextLiked, likes: nextLiked ? p.likes + 1 : p.likes - 1 };
+      })
     );
-    if (target && !target.liked && target.username !== session.username) {
+    if (shouldNotify) {
+      const target = shouldNotify as Post;
       const notif: Notification = {
         id: Date.now(),
         recipient: target.username,
@@ -1120,6 +1129,18 @@ export default function App() {
       }
       return next;
     });
+    if (usernameChanged) {
+      setNotifications((prev) =>
+        prev.map((n) => ({
+          ...n,
+          recipient: n.recipient === session.username ? updated.username : n.recipient,
+          actorUsername: n.actorUsername === session.username ? updated.username : n.actorUsername,
+          actorDisplayName:
+            n.actorUsername === session.username ? updated.displayName : n.actorDisplayName,
+          actorAvatar: n.actorUsername === session.username ? updated.avatar : n.actorAvatar,
+        }))
+      );
+    }
     setShowEdit(false);
     return null;
   };
@@ -1620,6 +1641,12 @@ export default function App() {
                       key={r.id}
                       className="grid-cell reel-cell"
                       onClick={() => setTab("reels")}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setTab("reels");
+                        }
+                      }}
                       role="button"
                       tabIndex={0}
                     >
