@@ -27,7 +27,21 @@ type Account = {
   bio?: string;
 };
 
-type Tab = "home" | "search" | "profile";
+type Tab = "home" | "reels" | "search" | "profile";
+
+type Reel = {
+  id: number;
+  username: string;
+  displayName: string;
+  avatar: string;
+  video: string;
+  poster?: string;
+  caption: string;
+  likes: number;
+  liked: boolean;
+};
+
+type ProfileTab = "posts" | "reels";
 
 type InstagramStatus = {
   connected: boolean;
@@ -51,6 +65,7 @@ const POSTS_KEY = `${STORAGE_PREFIX}posts`;
 const COMMENTS_KEY = `${STORAGE_PREFIX}comments`;
 const ACCOUNTS_KEY = `${STORAGE_PREFIX}accounts`;
 const SESSION_KEY = `${STORAGE_PREFIX}session`;
+const REELS_KEY = `${STORAGE_PREFIX}reels`;
 
 const storage = {
   get<T>(key: string, fallback: T): T {
@@ -282,20 +297,32 @@ function PostCard({
 }
 
 function AuthScreen({ onAuth }: { onAuth: (account: Account) => void }) {
-  const [mode, setMode] = useState<"login" | "signup">("signup");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("signup");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+
+  const switchTo = (m: "login" | "signup" | "forgot") => {
+    setMode(m);
+    setError("");
+    setInfo("");
+    setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setInfo("");
     const u = username.trim().toLowerCase();
-    const p = password;
     const d = displayName.trim();
 
-    if (!u || !p) { setError("Username and password are required."); return; }
+    if (!u) { setError("Please enter your username."); return; }
     if (!/^[a-z0-9._]{2,20}$/.test(u)) {
       setError("Username: 2–20 chars, letters, numbers, dot or underscore.");
       return;
@@ -304,31 +331,68 @@ function AuthScreen({ onAuth }: { onAuth: (account: Account) => void }) {
     const accounts = storage.get<Account[]>(ACCOUNTS_KEY, []);
 
     if (mode === "signup") {
+      if (!password) { setError("Please enter a password."); return; }
+      if (password.length < 4) { setError("Password should be at least 4 characters."); return; }
       if (!d) { setError("Please enter your display name."); return; }
       if (accounts.some((a) => a.username === u)) {
-        setError("That username is already taken.");
+        setError("That username is already taken on this device.");
         return;
       }
-      const account: Account = { username: u, password: p, displayName: d, avatar: "", bio: "" };
+      const account: Account = { username: u, password: password, displayName: d, avatar: "", bio: "" };
       storage.set(ACCOUNTS_KEY, [...accounts, account]);
       onAuth(account);
-    } else {
+      return;
+    }
+
+    if (mode === "login") {
+      if (!password) { setError("Please enter your password."); return; }
       const found = accounts.find((a) => a.username === u);
-      if (!found || found.password !== p) {
-        setError("Incorrect username or password.");
+      if (!found) {
+        setError("No account with that username on this device. New here? Tap “Create an account”.");
+        return;
+      }
+      if (found.password !== password) {
+        setError("Wrong password. Tap “Forgot password?” below to reset it.");
         return;
       }
       onAuth(found);
+      return;
     }
+
+    // forgot
+    if (!newPassword || !confirmPassword) { setError("Please enter and confirm a new password."); return; }
+    if (newPassword.length < 4) { setError("Password should be at least 4 characters."); return; }
+    if (newPassword !== confirmPassword) { setError("Passwords do not match."); return; }
+    const idx = accounts.findIndex((a) => a.username === u);
+    if (idx === -1) {
+      setError("No account with that username on this device.");
+      return;
+    }
+    const updated: Account[] = [...accounts];
+    updated[idx] = { ...updated[idx], password: newPassword };
+    storage.set(ACCOUNTS_KEY, updated);
+    setInfo("Password updated. You can now log in with your new password.");
+    setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setTimeout(() => { switchTo("login"); setUsername(u); }, 1200);
   };
+
+  const title =
+    mode === "signup" ? "Create your account"
+    : mode === "login" ? "Sign in to your account"
+    : "Reset your password";
+
+  const submitLabel =
+    mode === "signup" ? "Sign up"
+    : mode === "login" ? "Log in"
+    : "Reset password";
 
   return (
     <div className="auth-wrap">
       <div className="auth-card">
         <h1 className="logo auth-logo">DesiGram</h1>
-        <p className="auth-sub">
-          {mode === "signup" ? "Create your account" : "Sign in to your account"}
-        </p>
+        <p className="auth-sub">{title}</p>
 
         <form className="auth-form" onSubmit={submit}>
           {mode === "signup" && (
@@ -355,38 +419,79 @@ function AuthScreen({ onAuth }: { onAuth: (account: Account) => void }) {
             />
           </label>
 
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            />
-          </label>
+          {mode !== "forgot" && (
+            <label className="field">
+              <span>Password</span>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              />
+            </label>
+          )}
+
+          {mode === "forgot" && (
+            <>
+              <label className="field">
+                <span>New password</span>
+                <input
+                  type="password"
+                  placeholder="At least 4 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+              <label className="field">
+                <span>Confirm new password</span>
+                <input
+                  type="password"
+                  placeholder="Re-enter new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+            </>
+          )}
+
+          {mode === "login" && (
+            <div className="auth-forgot-row">
+              <button
+                type="button"
+                className="btn-text auth-forgot-link"
+                onClick={() => switchTo("forgot")}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           {error && <div className="form-error">{error}</div>}
+          {info && <div className="form-info">{info}</div>}
 
-          <button type="submit" className="btn-primary auth-submit">
-            {mode === "signup" ? "Sign up" : "Log in"}
-          </button>
+          <button type="submit" className="btn-primary auth-submit">{submitLabel}</button>
         </form>
 
         <div className="auth-switch">
-          {mode === "signup" ? (
+          {mode === "signup" && (
             <>
               Already have an account?{" "}
-              <button type="button" onClick={() => { setMode("login"); setError(""); }}>
-                Log in
-              </button>
+              <button type="button" onClick={() => switchTo("login")}>Log in</button>
             </>
-          ) : (
+          )}
+          {mode === "login" && (
             <>
               New here?{" "}
-              <button type="button" onClick={() => { setMode("signup"); setError(""); }}>
-                Create an account
-              </button>
+              <button type="button" onClick={() => switchTo("signup")}>Create an account</button>
+            </>
+          )}
+          {mode === "forgot" && (
+            <>
+              Remembered it?{" "}
+              <button type="button" onClick={() => switchTo("login")}>Back to log in</button>
             </>
           )}
         </div>
@@ -676,9 +781,19 @@ export default function App() {
   const [igStatus, setIgStatus] = useState<InstagramStatus | null>(null);
   const [igMedia, setIgMedia] = useState<InstagramMedia[]>([]);
   const [igNotice, setIgNotice] = useState<string>("");
+  const [reels, setReels] = useState<Reel[]>(() => storage.get<Reel[]>(REELS_KEY, []));
+  const [showReelComposer, setShowReelComposer] = useState(false);
+  const [reelVideoData, setReelVideoData] = useState("");
+  const [reelCaption, setReelCaption] = useState("");
+  const [reelError, setReelError] = useState("");
+  const [profileTab, setProfileTab] = useState<ProfileTab>("posts");
 
   useEffect(() => { storage.set(POSTS_KEY, posts); }, [posts]);
   useEffect(() => { storage.set(COMMENTS_KEY, commentsByPost); }, [commentsByPost]);
+  useEffect(() => {
+    try { storage.set(REELS_KEY, reels); }
+    catch { /* quota — ignore */ }
+  }, [reels]);
   useEffect(() => {
     if (session) storage.set(SESSION_KEY, session);
     else storage.remove(SESSION_KEY);
@@ -923,7 +1038,73 @@ export default function App() {
 
   const logout = () => setSession(null);
 
+  const toggleReelLike = (id: number) => {
+    setReels((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? { ...r, liked: !r.liked, likes: r.likes + (r.liked ? -1 : 1) }
+          : r
+      )
+    );
+  };
+
+  const deleteReel = (id: number) => {
+    setReels((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const resetReelComposer = () => {
+    setShowReelComposer(false);
+    setReelVideoData("");
+    setReelCaption("");
+    setReelError("");
+  };
+
+  const onReelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setReelError("");
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setReelError("Please select a video file.");
+      return;
+    }
+    const MAX = 6 * 1024 * 1024;
+    if (file.size > MAX) {
+      setReelError("Video too large. Please pick a clip under 6 MB.");
+      return;
+    }
+    try {
+      const data = await readFileAsDataURL(file);
+      setReelVideoData(data);
+    } catch {
+      setReelError("Could not read that video.");
+    }
+  };
+
+  const submitReel = (e: React.FormEvent) => {
+    e.preventDefault();
+    setReelError("");
+    if (!reelVideoData) { setReelError("Please add a video."); return; }
+    const newReel: Reel = {
+      id: Date.now(),
+      username: session.username,
+      displayName: session.displayName,
+      avatar: session.avatar,
+      video: reelVideoData,
+      caption: reelCaption.trim(),
+      likes: 0,
+      liked: false,
+    };
+    try {
+      setReels((prev) => [newReel, ...prev]);
+      resetReelComposer();
+      setTab("reels");
+    } catch {
+      setReelError("Could not save reel. Try a smaller video.");
+    }
+  };
+
   const myPosts = posts.filter((p) => p.username === session.username);
+  const myReels = reels.filter((r) => r.username === session.username);
   const filteredAccounts = accounts.filter((a) => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return a.username !== session.username;
@@ -951,6 +1132,17 @@ export default function App() {
               Get app
             </button>
           )}
+          <button
+            className="icon-btn create-btn"
+            aria-label="Upload a reel"
+            onClick={() => setShowReelComposer(true)}
+            title="Upload a reel"
+          >
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="5" width="18" height="14" rx="3" />
+              <path d="M10 9.5v5l5-2.5-5-2.5z" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
           <button
             className="icon-btn create-btn"
             aria-label="Create new post"
@@ -1051,6 +1243,66 @@ export default function App() {
           </section>
         )}
 
+        {tab === "reels" && (
+          <section className="reels-feed">
+            {reels.length === 0 ? (
+              <div className="empty-feed">
+                <div className="empty-title">No reels yet</div>
+                <div className="empty-sub">Upload your first short video.</div>
+                <button className="btn-primary" onClick={() => setShowReelComposer(true)}>
+                  Upload a reel
+                </button>
+              </div>
+            ) : (
+              reels.map((r) => (
+                <article key={r.id} className="reel-card">
+                  <video
+                    className="reel-video"
+                    src={r.video}
+                    poster={r.poster}
+                    controls
+                    playsInline
+                    loop
+                    preload="metadata"
+                  />
+                  <div className="reel-overlay">
+                    <div className="reel-author">
+                      <Avatar
+                        src={r.avatar}
+                        name={r.displayName}
+                        username={r.username}
+                        size={36}
+                      />
+                      <div className="reel-author-text">
+                        <span className="username">{r.displayName}</span>
+                        <span className="handle">@{r.username}</span>
+                      </div>
+                    </div>
+                    {r.caption && <div className="reel-caption">{r.caption}</div>}
+                    <div className="reel-actions">
+                      <button
+                        className={`reel-like ${r.liked ? "liked" : ""}`}
+                        onClick={() => toggleReelLike(r.id)}
+                        aria-label={r.liked ? "Unlike" : "Like"}
+                      >
+                        {r.liked ? "♥" : "♡"} {r.likes}
+                      </button>
+                      {r.username === session.username && (
+                        <button
+                          className="btn-text reel-delete"
+                          onClick={() => deleteReel(r.id)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))
+            )}
+          </section>
+        )}
+
         {tab === "search" && (
           <section className="search">
             <input
@@ -1093,6 +1345,7 @@ export default function App() {
                 <div className="profile-handle">@{session.username}</div>
                 <div className="profile-stats">
                   <span><strong>{myPosts.length}</strong> posts</span>
+                  <span><strong>{myReels.length}</strong> reels</span>
                 </div>
               </div>
             </div>
@@ -1109,22 +1362,70 @@ export default function App() {
               <button className="btn-text" onClick={logout}>Log out</button>
             </div>
 
-            {myPosts.length === 0 ? (
-              <div className="empty-feed empty-profile">
-                <div className="empty-title">No posts yet</div>
-                <div className="empty-sub">Your photos will show up here.</div>
-                <button className="btn-primary" onClick={() => setShowComposer(true)}>
-                  Share a photo
-                </button>
-              </div>
-            ) : (
-              <div className="grid">
-                {myPosts.map((p) => (
-                  <div key={p.id} className="grid-cell">
-                    <img src={p.image} alt={p.caption} />
-                  </div>
-                ))}
-              </div>
+            <div className="profile-tabs" role="tablist">
+              <button
+                role="tab"
+                aria-selected={profileTab === "posts"}
+                className={`profile-tab ${profileTab === "posts" ? "active" : ""}`}
+                onClick={() => setProfileTab("posts")}
+              >
+                Posts
+              </button>
+              <button
+                role="tab"
+                aria-selected={profileTab === "reels"}
+                className={`profile-tab ${profileTab === "reels" ? "active" : ""}`}
+                onClick={() => setProfileTab("reels")}
+              >
+                Reels
+              </button>
+            </div>
+
+            {profileTab === "posts" && (
+              myPosts.length === 0 ? (
+                <div className="empty-feed empty-profile">
+                  <div className="empty-title">No posts yet</div>
+                  <div className="empty-sub">Your photos will show up here.</div>
+                  <button className="btn-primary" onClick={() => setShowComposer(true)}>
+                    Share a photo
+                  </button>
+                </div>
+              ) : (
+                <div className="grid">
+                  {myPosts.map((p) => (
+                    <div key={p.id} className="grid-cell">
+                      <img src={p.image} alt={p.caption} />
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {profileTab === "reels" && (
+              myReels.length === 0 ? (
+                <div className="empty-feed empty-profile">
+                  <div className="empty-title">No reels yet</div>
+                  <div className="empty-sub">Upload your first short video.</div>
+                  <button className="btn-primary" onClick={() => setShowReelComposer(true)}>
+                    Upload a reel
+                  </button>
+                </div>
+              ) : (
+                <div className="grid">
+                  {myReels.map((r) => (
+                    <div
+                      key={r.id}
+                      className="grid-cell reel-cell"
+                      onClick={() => setTab("reels")}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <video src={r.video} muted playsInline preload="metadata" />
+                      <span className="reel-cell-badge" aria-hidden>▶</span>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </section>
         )}
@@ -1139,6 +1440,16 @@ export default function App() {
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 12 12 3l9 9" strokeLinejoin="round" />
             <path d="M5 10v10h14V10" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          className={`nav-btn ${tab === "reels" ? "active" : ""}`}
+          onClick={() => setTab("reels")}
+          aria-label="Reels"
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="3" />
+            <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none" />
           </svg>
         </button>
         <button
@@ -1227,6 +1538,63 @@ export default function App() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary">Share</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showReelComposer && (
+        <div className="modal-backdrop" onClick={resetReelComposer}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>New reel</h2>
+              <button className="icon-btn" aria-label="Close" onClick={resetReelComposer}>×</button>
+            </div>
+            <form className="composer" onSubmit={submitReel}>
+              <div className="composer-author">
+                <Avatar
+                  src={session.avatar}
+                  name={session.displayName}
+                  username={session.username}
+                  size={36}
+                />
+                <div>
+                  <div className="username">{session.displayName}</div>
+                  <div className="handle">@{session.username}</div>
+                </div>
+              </div>
+
+              {reelVideoData ? (
+                <div className="composer-preview reel-preview">
+                  <video src={reelVideoData} controls playsInline />
+                </div>
+              ) : (
+                <div className="composer-placeholder">Pick a short video (under 6 MB)</div>
+              )}
+
+              <label className="field">
+                <span>Video file</span>
+                <input type="file" accept="video/*" onChange={onReelFile} />
+              </label>
+
+              <label className="field">
+                <span>Caption</span>
+                <textarea
+                  rows={3}
+                  placeholder="Say something about your reel…"
+                  value={reelCaption}
+                  onChange={(e) => setReelCaption(e.target.value)}
+                />
+              </label>
+
+              {reelError && <div className="form-error">{reelError}</div>}
+
+              <div className="composer-actions">
+                <button type="button" className="btn-secondary" onClick={resetReelComposer}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">Share reel</button>
               </div>
             </form>
           </div>
