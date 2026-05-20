@@ -1181,3 +1181,13 @@ h1, h2, p, span, div, label, button, input, textarea, a {
   background: #1a1a1a;
   color: #fff;
 }
+
+/* Hidden file inputs that still receive synthetic .click() across mobile browsers */
+.reel-hidden-input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  left: -9999px;
+}

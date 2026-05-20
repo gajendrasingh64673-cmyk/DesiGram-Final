@@ -854,7 +854,8 @@ export default function App() {
   const [profileTab, setProfileTab] = useState<ProfileTab>("posts");
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
-  const reelFileInputRef = useRef<HTMLInputElement>(null);
+  const reelCameraInputRef = useRef<HTMLInputElement>(null);
+  const reelGalleryInputRef = useRef<HTMLInputElement>(null);
   const [notifications, setNotifications] = useState<Notification[]>(
     () => storage.get<Notification[]>(NOTIFS_KEY, [])
   );
@@ -1837,14 +1838,14 @@ export default function App() {
               <span>Recents</span>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
-            <button type="button" className="reel-select-pill" onClick={() => reelFileInputRef.current?.click()}>
+            <button type="button" className="reel-select-pill" onClick={() => reelGalleryInputRef.current?.click()}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="14" height="14" rx="2"/><rect x="8" y="8" width="12" height="12" rx="2"/></svg>
               <span>Select</span>
             </button>
           </div>
 
           <div className="reel-picker-grid">
-            <button type="button" className="reel-grid-cell reel-camera-cell" onClick={() => reelFileInputRef.current?.click()} aria-label="Pick a video">
+            <button type="button" className="reel-grid-cell reel-camera-cell" onClick={() => reelCameraInputRef.current?.click()} aria-label="Record a video">
               <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
             </button>
             {reelVideoData && (
@@ -1866,10 +1867,18 @@ export default function App() {
           </div>
 
           <input
-            ref={reelFileInputRef}
+            ref={reelCameraInputRef}
             type="file"
             accept="video/*"
-            style={{ display: "none" }}
+            capture="environment"
+            className="reel-hidden-input"
+            onChange={onReelFile}
+          />
+          <input
+            ref={reelGalleryInputRef}
+            type="file"
+            accept="video/*"
+            className="reel-hidden-input"
             onChange={onReelFile}
           />
 
