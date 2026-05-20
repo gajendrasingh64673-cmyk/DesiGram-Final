@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install -g pnpm && pnpm install",
-  "buildCommand": "cd artifacts/instagram-clone && pnpm run build",
+  "installCommand": "npm install -g pnpm@9 && pnpm install --filter @workspace/instagram-clone... --config.minimumReleaseAge=0",
+  "buildCommand": "pnpm --filter @workspace/instagram-clone run build",
   "outputDirectory": "artifacts/instagram-clone/dist/public",
   "framework": null,
   "rewrites": [
